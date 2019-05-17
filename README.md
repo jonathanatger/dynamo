@@ -1,7 +1,8 @@
 # Dynamo
-All files related to Dynamo. 
+All files related to Dynamo. Nodes from the Morpheus package
 
 Contains :
 - LinkModel Node
-- LinkDwg Node (to come)
-- SetPerspectiveFieldOfView (to come)
+- LinkDwg Node 
+- PerspectiveView.SetFieldOfView Node
+- and more
