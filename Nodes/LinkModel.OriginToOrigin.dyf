@@ -1,0 +1,264 @@
+{
+  "Uuid": "bac76904-e269-40b2-865f-94cd5aa8b161",
+  "IsCustomNode": true,
+  "Category": "Morpheus",
+  "Description": "Link models origin to origin. Optionally, the node can place the models on the selected worksets and pin them in place.",
+  "Name": "LinkModel.OriginToOrigin",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Output, DynamoCore",
+      "NodeType": "OutputNode",
+      "ElementResolver": null,
+      "Symbol": "LinkInstance",
+      "Id": "6f98e2ea561c4619ab2cca8b816a7b27",
+      "Inputs": [
+        {
+          "Id": "344137f71fdc4c0ba5485631a1d56361",
+          "Name": "",
+          "Description": "",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [],
+      "Replication": "Disabled",
+      "Description": "Sortie de fonction, utiliser avec les noeuds personnalisés"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "Filepaths",
+        "TypeName": "var",
+        "TypeRank": -1,
+        "DefaultValue": null,
+        "Description": "Input the filepaths of selected models here"
+      },
+      "Id": "c80bddd022484a94a9ba007c4443a7c7",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "aac0e273c112458a8b270c1f25f287d1",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "Worksets_optional",
+        "TypeName": "var",
+        "TypeRank": -1,
+        "DefaultValue": "None",
+        "Description": "Input the worksets the links will be placed on.\nIf no workset is placed here, the links will be placed on current workset."
+      },
+      "Id": "8f94a47017c04e109528095d3eb5c7b8",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "efdacbad30834578a4bca630886c4ed7",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "PinLinks_optional",
+        "TypeName": "bool",
+        "TypeRank": 0,
+        "DefaultValue": "false",
+        "Description": "Input 'true' if you want to pin the links in place."
+      },
+      "Id": "95ac68e033d74c1baaabc6a4203ede89",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "1a91863d78f640c6ab0f215ca0fa3d72",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    },
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "NodeType": "PythonScriptNode",
+      "Code": "\n# part of the code originally created by Nicklas Østertgaard  nvo@bimshark.com / nvo@shl.fk  and/or Augusto Goncalves (AEC Devblog)\n# Workset management, loop, pin and site location settings by Jonathan ATGER (jonathan.atger@yahoo.fr)\n\nimport clr\n\n# Import ToDSType(bool) extension method\nclr.AddReference(\"RevitNodes\")\nimport Revit\nclr.ImportExtensions(Revit.Elements)\n\n# Import DocumentManager and TransactionManager\nclr.AddReference(\"RevitServices\")\nimport RevitServices\nfrom RevitServices.Persistence import DocumentManager\nfrom RevitServices.Transactions import TransactionManager\nfrom System.Collections.Generic import *\n\n# Import RevitAPI\nclr.AddReference(\"RevitAPI\")\nimport Autodesk\nfrom Autodesk.Revit.DB import *\n\nimport sys\npyt_path = r'C:\\Program Files (x86)\\IronPython 2.7\\Lib'\nsys.path.append(pyt_path)\nimport System\n\ndoc = DocumentManager.Instance.CurrentDBDocument\n\n# Start Transaction\nTransactionManager.Instance.EnsureInTransaction(doc)\n\nif isinstance(IN[0], list) : in_links = IN[0] \nelse : in_links = [IN[0]]\n\nif isinstance(IN[1], list) : in_ws = IN[1] \nelse : in_ws = [IN[1]]\n\n# number of elements\ntry : numlinks = len(IN[0])\nexcept : OUT = 'append link'\n\t\ntry : numworksets = len(IN[1])\nexcept : numworksets = 0\n\n#check list lengths\nif numlinks == numworksets : listlength = True\nelse : listlength = False\n\ndef linkmodel (fpath, options, doc, pin) :\n\t# Create the Revit Link Type\n\tmp = ModelPathUtils.ConvertUserVisiblePathToModelPath(fpath)\n\tlnkOp = RevitLinkOptions(options)\n\tloadedLnkType = RevitLinkType.Create(doc, mp, lnkOp)\n\t\n\t# Create the Revit Link Instance\n\tlnkInstance = RevitLinkInstance.Create(doc, loadedLnkType.ElementId, ImportPlacement.Origin)\n\t\n\t#Pin link\n\tlnkInstance.Pinned = pin\n\treturn lnkInstance\n\ntry:\n\t# Number of worksets input and filepaths input are different\n\tif IN[1] and listlength == False :\n\t\tOUT = \"The number of worksets doesn't match the number of links\"\n\t\t\n\t\t\n\t# Multiple Worksets input\n\telif IN[1] and listlength == True  :\n\t\n\t\t#Get WorksetTable and current workset\n\t\twstable = doc.GetWorksetTable()\n\t\tactivewsid = wstable.GetActiveWorksetId()\n\t\t\n\t\t#Create list for output\n\t\tlinks = []\n\t\t\n\t\tfor fpath, ws in zip(in_links, in_ws) :\n\t\t\n\t\t\t# Get WorksetId\n\t\t\twssimpleid = ws.Id\n\t\t\twsid = WorksetId(wssimpleid)\n\t\t\t\t\n\t\t\t# Set the workset\n\t\t\tWorksetTable.SetActiveWorksetId(wstable, wsid)\n\t\t\t\n\t\t\t# Create the Revit Link Type and Link Instance\n\t\t\ta = linkmodel(fpath,\"\", doc, IN[2])\n\t\t\t\n\t\t\t#add created link to output\n\t\t\tlinks.append(a)\n\t\t\t\t\t\t\t\n\t\t#reset current workset\t\n\t\tWorksetTable.SetActiveWorksetId(wstable, activewsid)\n\t\t\n\t\t#output\n\t\tOUT = links\t\n\n\t# No worksets input\n\telse :\n\t\tlinks = []\n\t\tfor fpath in in_links :\n\t\t\ta = linkmodel(fpath, \"\", doc, IN[2])\n\t\t\tlinks.append(a)\n\t\tOUT=links\n\t\nexcept:\n    # if error accurs anywhere in the process catch it\n    import traceback\n    errorReport = traceback.format_exc()\n    OUT = errorReport \n\n# End Transaction\nTransactionManager.Instance.TransactionTaskDone()\n\n",
+      "VariableInputPorts": true,
+      "Id": "82f00273d6b145c5912eff9bf18b15af",
+      "Inputs": [
+        {
+          "Id": "7ff30e3a36d446c3b69de14d24fae589",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "470a9953382b402fae385c455f446892",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "6e5d074d07814d5191b01ee66ec4789e",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "2d7a333ca0f7497daa64ff727f0fbaa2",
+          "Name": "OUT",
+          "Description": "Résultat du script Python",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Exécute un script IronPython intégré."
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "aac0e273c112458a8b270c1f25f287d1",
+      "End": "7ff30e3a36d446c3b69de14d24fae589",
+      "Id": "514fddddca434c58aa4a5078565be15c"
+    },
+    {
+      "Start": "efdacbad30834578a4bca630886c4ed7",
+      "End": "470a9953382b402fae385c455f446892",
+      "Id": "67f95501018c4e86b286e62e87ad6f98"
+    },
+    {
+      "Start": "1a91863d78f640c6ab0f215ca0fa3d72",
+      "End": "6e5d074d07814d5191b01ee66ec4789e",
+      "Id": "30ed0ecfbe6f4ed2b5050f0c45ebd53f"
+    },
+    {
+      "Start": "2d7a333ca0f7497daa64ff727f0fbaa2",
+      "End": "344137f71fdc4c0ba5485631a1d56361",
+      "Id": "d16f385c7e394b92b189bf08ac326b29"
+    }
+  ],
+  "Dependencies": [],
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": false,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.0.2.6826",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Aperçu en arrière-plan",
+      "EyeX": -17.0,
+      "EyeY": 24.0,
+      "EyeZ": 50.0,
+      "LookX": 12.0,
+      "LookY": -13.0,
+      "LookZ": -58.0,
+      "UpX": 0.0,
+      "UpY": 1.0,
+      "UpZ": 0.0
+    },
+    "NodeViews": [
+      {
+        "ShowGeometry": true,
+        "Name": "Output",
+        "Id": "6f98e2ea561c4619ab2cca8b816a7b27",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 1488.9932373910622,
+        "Y": 223.10337496965653
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "c80bddd022484a94a9ba007c4443a7c7",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 507.99323739106217,
+        "Y": 151.1033749696565
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "8f94a47017c04e109528095d3eb5c7b8",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 507.99323739106217,
+        "Y": 243.10337496965653
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "95ac68e033d74c1baaabc6a4203ede89",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 507.99323739106217,
+        "Y": 353.10337496965656
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Link",
+        "Id": "82f00273d6b145c5912eff9bf18b15af",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 1264.9932373910622,
+        "Y": 223.10337496965653
+      }
+    ],
+    "Annotations": [],
+    "X": 220.29088718615515,
+    "Y": 190.94615165083229,
+    "Zoom": 0.50922842211020058
+  }
+}
