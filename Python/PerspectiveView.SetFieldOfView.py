@@ -1,3 +1,5 @@
+#Jonathan Atger, 2019.
+
 import clr
 
 # Import DocumentManager and TransactionManager
