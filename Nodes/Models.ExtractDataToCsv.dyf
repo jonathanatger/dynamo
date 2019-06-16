@@ -1,0 +1,508 @@
+{
+  "Uuid": "51659221-bb13-4e2a-8164-222fce6d613a",
+  "IsCustomNode": true,
+  "Category": "Morpheus.Data",
+  "Description": "Extracts a set of parameters from given categories, in every Revit model fed in the node.",
+  "Name": "Models.ExtractDataToCsv",
+  "ElementResolver": {
+    "ResolutionMap": {
+      "Revit.Category": {
+        "Key": "Revit.Elements.Category",
+        "Value": "RevitNodes.dll"
+      }
+    }
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Output, DynamoCore",
+      "NodeType": "OutputNode",
+      "ElementResolver": null,
+      "Symbol": "ExtractedData",
+      "Id": "73fe83dd25b841deb81b197363010caf",
+      "Inputs": [
+        {
+          "Id": "10d5867da99e42e88563e658a4115509",
+          "Name": "",
+          "Description": "",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [],
+      "Replication": "Disabled",
+      "Description": "Sortie de fonction, utiliser avec les noeuds personnalisés"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Output, DynamoCore",
+      "NodeType": "OutputNode",
+      "ElementResolver": null,
+      "Symbol": "CsvFile",
+      "Id": "04ff73c298e7404abc70bf80dd90a410",
+      "Inputs": [
+        {
+          "Id": "7b606c2d037f4a0888c843bfa8bdac9a",
+          "Name": "",
+          "Description": "",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [],
+      "Replication": "Disabled",
+      "Description": "Sortie de fonction, utiliser avec les noeuds personnalisés"
+    },
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "NodeType": "PythonScriptNode",
+      "Code": "#Made by Jonathan ATGER, 2019\n\n\nimport clr\n#clr.AddReference('ProtoGeometry')\n#from Autodesk.DesignScript.Geometry import *\n\nimport sys\npyt_path = r'C:\\Program Files (x86)\\IronPython 2.7\\Lib'\nsys.path.append(pyt_path)\nimport System\n\n# Import Element wrapper extension methods\nclr.AddReference(\"RevitNodes\")\nimport Revit\nclr.ImportExtensions(Revit.Elements)\n\n# Import DocumentManager and TransactionManager\nclr.AddReference(\"RevitServices\")\nimport RevitServices\nfrom RevitServices.Persistence import DocumentManager\n#from RevitServices.Transactions import TransactionManager\n\n#doc = DocumentManager.Instance.CurrentDBDocument\nuiapp = DocumentManager.Instance.CurrentUIApplication\napp = uiapp.Application\n\nimport csv\nimport time\n\n# Import RevitAPI\nclr.AddReference(\"RevitAPI\")\nimport Autodesk\nfrom Autodesk.Revit.DB import *\n\n\n\n#inputs\nif isinstance(IN[0], list) : filepaths = IN[0]\nelse : filepaths = [IN[0]]\n\ndirectorypath = IN[1] \n\nif isinstance(IN[2], list) : categories = IN[2]\nelse : categories = [IN[2]]\n\nif isinstance(IN[3], list) :params = IN[3]\nelse : params = [IN[3]]\n\nmodelname = IN[4]\ngetid = IN[5]\n\n\npaths = []\nfor p in filepaths :\n\tmodelpath = ModelPathUtils.ConvertUserVisiblePathToModelPath(p)\n\tpaths.append(modelpath)\n\t\n#Setup list for the output of the node\nout = []\nheaders = []\n\n\n#create headers for csv file\nif modelname == True :\n\theaders.append(\"File Name\")\nif getid == True :\n\theaders.append(\"Id\")\t\nfor c in params :\n\theaders.append(c)\n\t\nout.append(headers)\n\n# det document opening option \noptions = OpenOptions()\noptions.DetachFromCentralOption = DetachFromCentralOption.DetachAndPreserveWorksets\n\t\n\n\t\ntry :\n\tfor i in paths :\n\t\t#open revit document\n\t\topendoc = app.OpenDocumentFile(i, options)\n\t\t\n\t\tif IN[4] == True :\n\t\t\t#add document name\n\t\t\tpathname = opendoc.PathName\n\t\t\tname = pathname.split(\"\\\\\")[-1]\n\t\t\n\t\tfor c in categories :\n\t\t\t\n\t\t\t#filter\n\t\t\tfilter = ElementCategoryFilter(System.Enum.ToObject(BuiltInCategory, c.Id))\n\t\t\t\t\n\t\t\t#Collector filtering out types\n\t\t\tcol = FilteredElementCollector(opendoc).WherePasses(filter).WhereElementIsNotElementType().ToElements()\n\t\t\t\n\t\t\tfor e in col :\n\t\t\t\telementdata = []\n\t\t\t\t\n\t\t\t\tif modelname == True :\n\t\t\t\t\telementdata.append(name)\n\t\t\t\t\n\t\t\t\tif getid == True :\n\t\t\t\t\telementdata.append(e.Id)\n\t\t\t\t\n\t\t\t\tfor p in params :\n\t\t\t\t\ttry :\n\t\t\t\t\t\t#append properties\n\t\t\t\t\t\tparam = e.LookupParameter(p).AsValueString()\n\t\t\t\t\t\tif param == None :\n\t\t\t\t\t\t\tparam2 = e.LookupParameter(p).AsString()\n\t\t\t\t\t\t\telementdata.append(param2)\n\t\t\t\t\t\telse :\n\t\t\t\t\t\t\telementdata.append(param)\n\t\t\t\t\t\n\t\t\t\t\t\n\t\t\t\t\texcept :\n\t\t\t\t\t\telementdata.append(\"No parameter with the given name\")\n\t\t\t\t\t\t\n\t\t\t\t#append the elementdata to the right category\t\t\n\t\t\t\tout.append(elementdata)\n\t\t\t\n\t\t\t\n\t\t#Close document\n\t\topendoc.Close(False)\n\t\n\tfilename = directorypath + '\\\\modeldata_' + time.strftime(\"%Y%m%d_%H%M%S\") + '.csv'\n\t\n\tOUT = out[1:], filename\n\t\n\t#get the directory for extraction\n\t#os.chdir(IN[5])\n\t\n\twith open(filename, mode='wb') as csv_file :\n\t\tcsv_filewriter = csv.writer(csv_file, delimiter=';', quotechar='\"', quoting=csv.QUOTE_MINIMAL)\n\t\tfor line in out :\n\t\t\tcsv_filewriter.writerow(line)\n\n\t\nexcept:\n    # if error accurs anywhere in the process catch it\n    import traceback\n    errorReport = traceback.format_exc()\n    OUT = errorReport \n\n",
+      "VariableInputPorts": true,
+      "Id": "bac30e28351b4772b8de6f731d5265e8",
+      "Inputs": [
+        {
+          "Id": "53da2af67f8341fc816175d96452c587",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "702798017a5b40169818ce692a806067",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "0fe2a9b495ab40bd84ac9fbdbe7fbea9",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "85b6f8a262c44df29bc868d2a1e6ede7",
+          "Name": "IN[3]",
+          "Description": "Input #3",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "e6500643daef4fcdbd3b2ba37f61f2a1",
+          "Name": "IN[4]",
+          "Description": "Input #4",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "de98b90af7b44e93b84850a413c8a96c",
+          "Name": "IN[5]",
+          "Description": "Input #5",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "774d4a9b45c8487a8a3beda644123891",
+          "Name": "OUT",
+          "Description": "Résultat du script Python",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Exécute un script IronPython intégré."
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CodeBlockNodeModel, DynamoCore",
+      "NodeType": "CodeBlockNode",
+      "Code": "out[0];\nout[1];",
+      "Id": "5388c2558fc5451c91244e35cd806cfb",
+      "Inputs": [
+        {
+          "Id": "7efe6f0ebe124c5f9363504a2e6bfb9f",
+          "Name": "out",
+          "Description": "out",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "b40120b10ad04779a99f6b40e4fa0ec7",
+          "Name": "",
+          "Description": "Valeur de l'expression à la ligne 1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "620391fa02b34a2fa073cb92ddeffe65",
+          "Name": "",
+          "Description": "Valeur de l'expression à la ligne 2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Permet de créer le code DesignScript directement"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "Filepaths",
+        "TypeName": "string",
+        "TypeRank": -1,
+        "DefaultValue": null,
+        "Description": "Input the filepaths of selected models here"
+      },
+      "Id": "a54633ff13044cb38f2c7c8f94b421c4",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "52e998be8753427daedda4493ea9644d",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "OutputDirectoryForCSV",
+        "TypeName": "string",
+        "TypeRank": 0,
+        "DefaultValue": null,
+        "Description": "Input the directory path where the Csv file is going to be saved"
+      },
+      "Id": "d9d6c147384c4bf7af0c7fd069d9b9f5",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "b48a9edc88b24168a7c06c916d312f95",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "Categories",
+        "TypeName": "var",
+        "TypeRank": -1,
+        "DefaultValue": null,
+        "Description": "Categories to extract data from"
+      },
+      "Id": "3039a7c636d24158a3713865b8ade0c0",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "5509af79109c45d0867b1e26bd9d7dcd",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "ParameterNames",
+        "TypeName": "string",
+        "TypeRank": -1,
+        "DefaultValue": null,
+        "Description": "Name of the parameters which hold the desired data"
+      },
+      "Id": "410de629d3b940d2a040ee3cbdda8f13",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "4aeb1c9f64fc4c85b360d0892e06619e",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "optional_IncludeFileNames",
+        "TypeName": "bool",
+        "TypeRank": 0,
+        "DefaultValue": null,
+        "Description": "Set to true if you need to include the filenames to reference where the data is coming from "
+      },
+      "Id": "6e1416bd58d44d998af814b9df31362c",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "846bd4b7bc3a4ed88c7915e044b1c0bf",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    },
+    {
+      "ConcreteType": "Dynamo.Graph.Nodes.CustomNodes.Symbol, DynamoCore",
+      "NodeType": "InputNode",
+      "Parameter": {
+        "Name": "optional_IncludeElementIds",
+        "TypeName": "bool",
+        "TypeRank": 0,
+        "DefaultValue": null,
+        "Description": "Set to true if you need to include the Ids of the elements from which the data comes from "
+      },
+      "Id": "d61c30fab3cf49eca13ebd93297fd13c",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "2525311ff3cb4017ac366d72c4fd7e02",
+          "Name": "",
+          "Description": "Symbole",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Un paramètre de fonction, utiliser avec des noeuds personnalisés.\r\n\r\nVous pouvez spécifier le type et la valeur par défaut du paramètre. Par exemple,\r\n\r\nentrée: var[]..[]\r\nvaleur: bool = false"
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "774d4a9b45c8487a8a3beda644123891",
+      "End": "7efe6f0ebe124c5f9363504a2e6bfb9f",
+      "Id": "79338be7d3294dba8f8c2725b764047b"
+    },
+    {
+      "Start": "b40120b10ad04779a99f6b40e4fa0ec7",
+      "End": "10d5867da99e42e88563e658a4115509",
+      "Id": "b482d1bc4e9348758376e655fdf25c93"
+    },
+    {
+      "Start": "620391fa02b34a2fa073cb92ddeffe65",
+      "End": "7b606c2d037f4a0888c843bfa8bdac9a",
+      "Id": "afb7dd6514904c4ebd0cd67855546f01"
+    },
+    {
+      "Start": "52e998be8753427daedda4493ea9644d",
+      "End": "53da2af67f8341fc816175d96452c587",
+      "Id": "19278dd3f90a4ab38a122b099eda0e18"
+    },
+    {
+      "Start": "b48a9edc88b24168a7c06c916d312f95",
+      "End": "702798017a5b40169818ce692a806067",
+      "Id": "8757d3e1371d4e84baafbe60c1441486"
+    },
+    {
+      "Start": "5509af79109c45d0867b1e26bd9d7dcd",
+      "End": "0fe2a9b495ab40bd84ac9fbdbe7fbea9",
+      "Id": "439bea8d1e964496b49c5eb8190e0d12"
+    },
+    {
+      "Start": "4aeb1c9f64fc4c85b360d0892e06619e",
+      "End": "85b6f8a262c44df29bc868d2a1e6ede7",
+      "Id": "86634089364a4b7ea95d93a90f9f3572"
+    },
+    {
+      "Start": "846bd4b7bc3a4ed88c7915e044b1c0bf",
+      "End": "e6500643daef4fcdbd3b2ba37f61f2a1",
+      "Id": "b61d171d8789483b883f9cb00930ad2e"
+    },
+    {
+      "Start": "2525311ff3cb4017ac366d72c4fd7e02",
+      "End": "de98b90af7b44e93b84850a413c8a96c",
+      "Id": "8b3d982d64a94f43a5c46cf315979e52"
+    }
+  ],
+  "Dependencies": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": false,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.0.2.6826",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "Aperçu en arrière-plan",
+      "EyeX": -41.669746398925781,
+      "EyeY": 110.59278869628906,
+      "EyeZ": 123.18321990966797,
+      "LookX": 41.669746398925781,
+      "LookY": -110.59278869628906,
+      "LookZ": -123.18321990966797,
+      "UpX": 0.1504361629486084,
+      "UpY": 0.882947564125061,
+      "UpZ": -0.444716215133667
+    },
+    "NodeViews": [
+      {
+        "ShowGeometry": true,
+        "Name": "Output",
+        "Id": "73fe83dd25b841deb81b197363010caf",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 769.39746055694206,
+        "Y": -236.6254759387042
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Output",
+        "Id": "04ff73c298e7404abc70bf80dd90a410",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 799.48976236389547,
+        "Y": -170.69247355949784
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Open Documents and get data in a csv file!",
+        "Id": "bac30e28351b4772b8de6f731d5265e8",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 248.53482632756993,
+        "Y": -238.36014428239261
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Code Block",
+        "Id": "5388c2558fc5451c91244e35cd806cfb",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": 568.50203849964646,
+        "Y": -231.66123066760929
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "a54633ff13044cb38f2c7c8f94b421c4",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -436.52623687944254,
+        "Y": -384.96724192608696
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "d9d6c147384c4bf7af0c7fd069d9b9f5",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -515.95121708597412,
+        "Y": -301.11954935268096
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "3039a7c636d24158a3713865b8ade0c0",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -365.36302905606988,
+        "Y": -218.91405099717662
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "410de629d3b940d2a040ee3cbdda8f13",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -456.53346957632289,
+        "Y": -128.69250638892044
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "6e1416bd58d44d998af814b9df31362c",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -578.19079932763145,
+        "Y": -54.76911981013518
+      },
+      {
+        "ShowGeometry": true,
+        "Name": "Input",
+        "Id": "d61c30fab3cf49eca13ebd93297fd13c",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "X": -529.08559103591551,
+        "Y": 47.5514060198841
+      }
+    ],
+    "Annotations": [],
+    "X": 647.66432698230824,
+    "Y": 395.47597726835284,
+    "Zoom": 0.7891610329248161
+  }
+}
