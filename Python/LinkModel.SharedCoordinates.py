@@ -1,5 +1,5 @@
 
-# part of the code originally created by Nicklas Østertgaard  nvo@bimshark.com / nvo@shl.fk  and/or Augusto Goncalves (AEC Devblog)
+# part of the code originally created by Nicklas Ã˜stertgaard  nvo@bimshark.com / nvo@shl.fk  and/or Augusto Goncalves (AEC Devblog)
 # Workset management, loop, pin and site location settings by Jonathan ATGER (jonathan.atger@yahoo.fr)
 
 import clr
@@ -38,10 +38,10 @@ if isinstance(IN[1], list) : in_ws = IN[1]
 else : in_ws = [IN[1]]
 
 # number of elements
-try : numlinks = len(IN[0])
+try : numlinks = len(in_links)
 except : OUT = 'append link'
 	
-try : numworksets = len(IN[1])
+try : numworksets = len(in_ws)
 except : numworksets = 0
 
 #check list lengths
